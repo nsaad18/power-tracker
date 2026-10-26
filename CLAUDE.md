@@ -14,7 +14,9 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 - Signature feature: tap the calorie ring to log food; logged foods float around the ring as bubbles.
 
 ## Features
-- Daily calories + protein / carbs / fat, diary by meal, day-to-day navigation, streak counter.
+- Motivational quote card under the header (`QUOTES` array): a new one on every open, when coming back to the app after 30+ s, or on tap.
+- Daily calories + protein / carbs / fat, diary by meal, day-to-day navigation (arrows or swipe on the ring), streak counter.
+- App feel: sticky blurred header, swipe a sheet down by its top bar to close, no double-tap zoom or text-select on buttons, page behind sheets doesn't scroll.
 - Search: built-in Canadian food list (`FOODS` array) + "Search online" via Open Food Facts (Canada filter).
 - Live barcode scanner: camera via `getUserMedia` + ZXing (`@zxing/library@0.21.3` from unpkg). Detects automatically, then looks the code up on Open Food Facts. Unknown products get entered once from the label and are saved in `P.barcodes`.
 - Quick add (calories and/or macros).

@@ -1,5 +1,5 @@
 // Offline support: app files come from cache first; food lookups always go to the network.
-const CACHE = "power-tracker-v1"; // bump this number after changing any app file
+const CACHE = "power-tracker-v2"; // bump this number after changing any app file
 const FILES = ["./", "index.html", "manifest.json", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png"];
 const ZXING = "https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js";
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES).then(() => c.add(ZXING).catch(() => {}))).then(() => self.skipWaiting())); });

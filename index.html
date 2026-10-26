@@ -14,9 +14,7 @@
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
-<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-</body>
-</html>
+<script defer src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <style>
 /* Layout: one-column phone app. Calorie ring is the hero; logged foods orbit it. Sheets slide up from the bottom. */
 :root{
@@ -36,10 +34,12 @@
   --font-num:ui-rounded,"SF Pro Rounded","Nunito",-apple-system,system-ui,sans-serif;
   color-scheme:dark;
 }
-html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{padding-bottom:env(safe-area-inset-bottom,0px)}
 html,body{margin:0;background:var(--bg);color:var(--fg);overflow-x:hidden;overflow-x:clip;overscroll-behavior-x:none;max-width:100%}
-body{font-family:var(--font-ui);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
-*{box-sizing:border-box}
+body{font-family:var(--font-ui);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html.lock,html.lock body{overflow:hidden}
+*{box-sizing:border-box;touch-action:manipulation}
+input,textarea{-webkit-user-select:text;user-select:text}
 [hidden]{display:none!important}
 img{max-width:100%}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -49,7 +49,19 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:800}
 
 /* header */
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:10;margin:-12px calc(-1 * max(16px,env(safe-area-inset-left,0px))) 0;padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-left,0px)) 10px;background:rgba(0,0,0,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+
+/* quote */
+.quote{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:var(--card);border-radius:14px;padding:12px 14px;font-weight:600;font-size:15px;line-height:1.35;color:#e5e5ea}
+.quote svg{flex:none;margin-top:1px}
+.quote.in span{animation:qin .5s ease both}
+@keyframes qin{from{opacity:0;transform:translateY(4px)}}
+
+/* press feedback, like a native app */
+.btn,.icon-btn,.nudge,.quote,.chip,.tab,.stepper button,.meal-add{transition:transform .12s,opacity .12s}
+.btn:active,.icon-btn:active,.nudge:active,.quote:active,.chip:active,.tab:active,.stepper button:active,.meal-add:active{transform:scale(.97);opacity:.8}
+.row:active{background:var(--card-2)}
+.datebar button:active,.close:active{opacity:.5}
 .brand{display:flex;align-items:center;gap:10px}
 .brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--red),var(--red-deep));display:grid;place-items:center}
 .brand h1{font-size:22px;font-weight:800;letter-spacing:-.02em;margin:0}
@@ -127,8 +139,9 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .scrim.on{opacity:1;pointer-events:auto}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:520px;margin:0 auto;background:#0f0f11;border-radius:22px 22px 0 0;border-top:1px solid var(--line);max-height:92%;display:flex;flex-direction:column;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.9,.2,1)}
 .sheet.on{transform:none}
+.sheet.drag{transition:none}
 .sheet.z2{z-index:31}.scrim.z2{z-index:30}
-.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:10px;touch-action:none;padding:10px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
 .sheet-h::before{content:"";position:absolute;top:6px;left:50%;width:36px;height:5px;border-radius:3px;background:#3a3a3e;transform:translateX(-50%)}
 .sheet-h h3{margin:8px 0 0;font-size:18px;font-weight:800}
 .sheet-h .close{margin-top:8px;color:var(--red);font-weight:700}
@@ -205,7 +218,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .mini{width:62px;padding:7px;text-align:center;background:#242427;border:1px solid var(--line);border-radius:9px;outline:none}
 
 @media (prefers-reduced-motion:reduce){
-  .bubble-in{animation:none!important}
+  .bubble-in,.quote.in span{animation:none!important}
   .sheet,.scrim,.ring-prog{transition:none}
 }
 /* live scanner */
@@ -241,6 +254,11 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
       </button>
     </div>
   </header>
+
+  <button class="quote" id="quote" aria-live="polite" aria-label="Motivational quote. Tap for another.">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="var(--red)"/></svg>
+    <span id="quoteText"></span>
+  </button>
 
   <div class="datebar">
     <button id="prevDay" aria-label="Previous day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -535,6 +553,7 @@ const $ = id => document.getElementById(id);
 /* ---------------- render: home ---------------- */
 const CIRC = 2*Math.PI*118;
 $("ringProg").style.strokeDasharray = CIRC;
+$("ringProg").style.strokeDashoffset = CIRC; // start empty so the ring fills up on open instead of draining
 
 function render(){
   const T = targets(), tot = totals(day.entries);
@@ -632,14 +651,30 @@ function renderDiary(){
 }
 
 /* ---------------- sheets ---------------- */
-function openSheet(name){ if (name === "Detail") stopScan(); $("sheet"+name).classList.add("on"); $("scrim"+name).classList.add("on"); }
+// stop the page behind an open sheet from scrolling
+const syncLock = () => document.documentElement.classList.toggle("lock", !!document.querySelector(".sheet.on"));
+function openSheet(name){ if (name === "Detail") stopScan(); $("sheet"+name).classList.add("on"); $("scrim"+name).classList.add("on"); syncLock(); }
 function closeSheet(name){
-  $("sheet"+name).classList.remove("on"); $("scrim"+name).classList.remove("on");
+  $("sheet"+name).classList.remove("on"); $("scrim"+name).classList.remove("on"); syncLock();
   if (name === "Log") stopScan();
   if (name === "Detail" && tab === "barcode" && $("sheetLog").classList.contains("on")) startScan();
 }
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeSheet(b.dataset.close));
 ["Log","Detail","Settings"].forEach(n => $("scrim"+n).onclick = () => closeSheet(n));
+// swipe a sheet down by its top bar to close it
+document.querySelectorAll(".sheet").forEach(sh => {
+  const name = sh.id.slice(5), h = sh.querySelector(".sheet-h");
+  let y0 = null, dy = 0;
+  h.addEventListener("touchstart", e => { if (e.target.closest("button")) return; y0 = e.touches[0].clientY; dy = 0; sh.classList.add("drag"); }, {passive:true});
+  h.addEventListener("touchmove", e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transform = `translateY(${dy}px)`; }, {passive:true});
+  const end = () => { if (y0 == null) return; y0 = null; sh.classList.remove("drag"); sh.style.transform = ""; if (dy > 90) closeSheet(name); };
+  h.addEventListener("touchend", end); h.addEventListener("touchcancel", end);
+});
+addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const top = ["Detail","Log","Settings"].find(n => $("sheet"+n).classList.contains("on"));
+  if (top) closeSheet(top);
+});
 
 /* ---------------- log sheet ---------------- */
 let tab = "search";
@@ -822,7 +857,13 @@ $("bcFile").onchange = async e => {
   if (!code) { st.className = "status err"; st.textContent = "Couldn't find a barcode in that photo. Try closer, with good light."; return; }
   lookupCode(code);
 };
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopScan(); else if (tab === "barcode" && $("sheetLog").classList.contains("on") && !$("sheetDetail").classList.contains("on")) startScan(); });
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); stopScan(); return; }
+  checkNewDay();
+  if (Date.now() - hiddenAt > 30000) showQuote(); // coming back to the app counts as a new visit
+  if (tab === "barcode" && $("sheetLog").classList.contains("on") && !$("sheetDetail").classList.contains("on")) startScan();
+});
 
 /* ---------------- quick add ---------------- */
 $("qaAdd").onclick = () => {
@@ -862,17 +903,16 @@ function openDetail({food, entry, barcode}){
   let editable = f.src === "manual" && !editing;
   $("fdTitle").textContent = editing ? "Edit entry" : "Add food";
   const body = $("fdBody");
-  const draw = () => {
-    const k = f.kcal*qty;
-    body.innerHTML = `
-      <div class="fd-hero"><span class="em">${esc(f.emoji||"🍽️")}</span><div><h4>${esc(f.name || "New product")}</h4>
-        <span>${esc(f.brand ? f.brand+" · " : "")}${esc(f.serving)}${f.src==="off" ? ' <span class="tag">Open Food Facts</span>' : ""}${barcode ? ` <span class="tag">${esc(barcode)}</span>` : ""}</span></div></div>
-      <div class="fd-stats">
-        <div><span class="num" style="color:var(--red)">${E(k)}</span><small>${EU()}</small></div>
+  const statsHTML = () => `
+        <div><span class="num" style="color:var(--red)">${E(f.kcal*qty)}</span><small>${EU()}</small></div>
         <div><span class="num" style="color:var(--protein)">${fmtG(f.p*qty)}</span><small>Protein g</small></div>
         <div><span class="num" style="color:var(--carbs)">${fmtG(f.c*qty)}</span><small>Carbs g</small></div>
-        <div><span class="num" style="color:var(--fat)">${fmtG(f.f*qty)}</span><small>Fat g</small></div>
-      </div>
+        <div><span class="num" style="color:var(--fat)">${fmtG(f.f*qty)}</span><small>Fat g</small></div>`;
+  const draw = () => {
+    body.innerHTML = `
+      <div class="fd-hero"><span class="em">${esc(f.emoji||"🍽️")}</span><div><h4 id="fdName0">${esc(f.name || "New product")}</h4>
+        <span>${esc(f.brand ? f.brand+" · " : "")}${esc(f.serving)}${f.src==="off" ? ' <span class="tag">Open Food Facts</span>' : ""}${barcode ? ` <span class="tag">${esc(barcode)}</span>` : ""}</span></div></div>
+      <div class="fd-stats" id="fdStats">${statsHTML()}</div>
       <div class="stepper"><button id="qMinus" aria-label="Less">−</button>
         <div><span class="num" id="qVal">${fmtG(qty)}</span><small>serving${qty===1?"":"s"} of ${esc(f.serving)}</small></div>
         <button id="qPlus" aria-label="More">+</button></div>
@@ -891,8 +931,9 @@ function openDetail({food, entry, barcode}){
     $("qPlus").onclick = () => { qty = Math.round((qty + (qty >= 1 ? 0.5 : 0.25))*100)/100; draw(); };
     $("fdMeals").onclick = e => { const b = e.target.closest("[data-m]"); if (b) { m = b.dataset.m; draw(); } };
     if (editable) {
-      const bind = (id, key, isNum) => $(id).onchange = ev => { f[key] = isNum ? num(ev.target.value) : ev.target.value; if (key==="kcal") f.kcal = Math.round(f.kcal); draw(); };
-      $("fdName").oninput = ev => { f.name = ev.target.value; $("fdGo").disabled = !f.name.trim(); }; bind("fdServ","serving"); bind("fdK","kcal",1); bind("fdP","p",1); bind("fdC","c",1); bind("fdF","f",1);
+      // update the numbers in place; redrawing the whole sheet would kick the cursor out of the next box
+      const bind = (id, key, isNum) => $(id).oninput = ev => { f[key] = isNum ? num(ev.target.value) : ev.target.value; if (key==="kcal") f.kcal = Math.round(f.kcal); $("fdStats").innerHTML = statsHTML(); };
+      $("fdName").oninput = ev => { f.name = ev.target.value; $("fdGo").disabled = !f.name.trim(); $("fdName0").textContent = f.name || "New product"; }; bind("fdServ","serving"); bind("fdK","kcal",1); bind("fdP","p",1); bind("fdC","c",1); bind("fdF","f",1);
     }
     $("fdGo").onclick = () => {
       if (editing) {
@@ -927,16 +968,27 @@ function openSettings(){ draft = JSON.parse(JSON.stringify(P)); renderSettings()
 $("openSettings").onclick = openSettings;
 $("nudge").onclick = openSettings;
 const segHTML = (key, opts, val) => `<div class="seg" data-seg="${key}">${opts.map(([v,l]) => `<button type="button" class="${String(v)===String(val)?"on":""}" data-v="${v}">${l}</button>`).join("")}</div>`;
+function targetHTML(){
+  const d = draft;
+  const prevT = (() => { const save = P; P = d; const t = targets(); P = save; return t; })();
+  return `<div class="target"><span class="flabel">Daily target</span><span class="num">${(d.units.e==="kJ"?Math.round(prevT.kcal*4.184):prevT.kcal).toLocaleString()} <small style="font-size:14px;color:var(--muted)">${d.units.e}</small></span></div>
+      <span class="hint">Protein ${prevT.p} g · Carbs ${prevT.c} g · Fat ${prevT.f} g</span>`;
+}
+function macroHint(){
+  const h = $("macroHint"); if (!h) return;
+  const sum = draft.custom[0]+draft.custom[1]+draft.custom[2];
+  h.style.color = sum !== 100 ? "var(--red)" : "";
+  h.textContent = `Total ${sum}%${sum!==100?" — needs to add up to 100%":""}`;
+}
+// typing in a box only refreshes the summary, so the cursor can move to the next box without the sheet redrawing
+function refreshSettings(){ $("setTarget").innerHTML = targetHTML(); macroHint(); }
 function renderSettings(){
   const d = draft, imp = d.units.w === "lb", ft = d.units.h === "ftin";
   const w = v => imp ? Math.round(v*2.20462*10)/10 : Math.round(v*10)/10;
-  const totalIn = d.heightCm/2.54;
-  const prevT = (() => { const save = P; P = d; const t = targets(); P = save; return t; })();
+  const totalIn = Math.round(d.heightCm/2.54);
   const pct = d.macro === "custom" ? d.custom : MACRO_PRESETS[d.macro].slice(0,3);
-  const sum = pct[0]+pct[1]+pct[2];
   $("setBody").innerHTML = `
-    <div class="group"><div class="target"><span class="flabel">Daily target</span><span class="num">${(d.units.e==="kJ"?Math.round(prevT.kcal*4.184):prevT.kcal).toLocaleString()} <small style="font-size:14px;color:var(--muted)">${d.units.e}</small></span></div>
-      <span class="hint">Protein ${prevT.p} g · Carbs ${prevT.c} g · Fat ${prevT.f} g</span></div>
+    <div class="group" id="setTarget">${targetHTML()}</div>
 
     <div class="group"><h4>Units</h4>
       <div class="field"><span class="flabel">Weight</span>${segHTML("units.w",[["kg","kg"],["lb","lb"]],d.units.w)}</div>
@@ -966,7 +1018,7 @@ function renderSettings(){
         <div class="field"><label for="sP" style="color:var(--protein)">Protein %</label><input class="inp num" id="sP" type="number" value="${d.custom[0]}"></div>
         <div class="field"><label for="sC" style="color:var(--carbs)">Carbs %</label><input class="inp num" id="sC" type="number" value="${d.custom[1]}"></div>
         <div class="field"><label for="sF" style="color:var(--fat)">Fat %</label><input class="inp num" id="sF" type="number" value="${d.custom[2]}"></div></div>
-        <span class="hint" style="${sum!==100?"color:var(--red)":""}">Total ${sum}%${sum!==100?" — needs to add up to 100%":""}</span>` :
+        <span class="hint" id="macroHint"></span>` :
         `<span class="hint">${pct[0]}% protein · ${pct[1]}% carbs · ${pct[2]}% fat</span>`}
     </div>
 
@@ -981,6 +1033,7 @@ function renderSettings(){
       <label class="btn ghosty" for="bkLoad">Restore<input id="bkLoad" type="file" accept="application/json,.json"></label></div>
       <span class="hint" id="bkMsg"></span>
     </div>`;
+  macroHint();
 }
 $("setBody").addEventListener("click", e => {
   const b = e.target.closest(".seg button"); if (!b) return;
@@ -1010,7 +1063,12 @@ $("setBody").addEventListener("change", async e => {
     } catch { $("bkMsg").textContent = "That file isn't a Power Tracker backup."; }
     return;
   }
-  const id = e.target.id, v = e.target.value, n = parseFloat(v);
+  readSetting(e.target);
+  if (e.target.type === "number") refreshSettings(); else renderSettings();
+});
+$("setBody").addEventListener("input", e => { if (e.target.type === "number") { readSetting(e.target); refreshSettings(); } });
+function readSetting(el){
+  const id = el.id, v = el.value, n = parseFloat(v);
   const toKg = x => draft.units.w === "lb" ? x/2.20462 : x;
   if (id==="sAge" && n>0) draft.age = n;
   if (id==="sCm" && n>0) draft.heightCm = n;
@@ -1020,12 +1078,11 @@ $("setBody").addEventListener("change", async e => {
   if (id==="sAct") draft.activity = n;
   if (id==="sGoal") draft.goal = n;
   if (id==="sP"||id==="sC"||id==="sF") draft.custom = [parseFloat($("sP").value)||0, parseFloat($("sC").value)||0, parseFloat($("sF").value)||0];
-  if (id==="sOv") draft.override = e.target.checked;
+  if (id==="sOv") draft.override = el.checked;
   if (id==="sOvK" && n>0) draft.overrideKcal = n;
-  renderSettings();
-});
+}
 $("saveSettings").onclick = () => {
-  if (draft.macro === "custom" && draft.custom.reduce((a,b)=>a+b,0) !== 100) { $("setBody").querySelector(".hint[style]")?.scrollIntoView({behavior:"smooth",block:"center"}); return; }
+  if (draft.macro === "custom" && draft.custom.reduce((a,b)=>a+b,0) !== 100) { $("macroHint")?.scrollIntoView({behavior:"smooth",block:"center"}); return; }
   draft.setup = true;
   // keep lists that may have changed while the sheet was open
   draft.recents = P.recents; draft.loggedDays = P.loggedDays; draft.barcodes = P.barcodes;
@@ -1045,8 +1102,69 @@ async function goDay(delta){
 }
 $("prevDay").onclick = () => goDay(-1);
 $("nextDay").onclick = () => goDay(1);
+// swipe left/right on the ring to change day
+let sx = null, sy = 0;
+$("stage").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive:true});
+$("stage").addEventListener("touchend", e => {
+  if (sx == null) return;
+  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)*1.5) goDay(dx < 0 ? 1 : -1);
+});
+// the app can stay open past midnight on a phone: move "Today" along with the clock
+let shownToday = todayISO();
+function checkNewDay(){
+  const t = todayISO(); if (t === shownToday) return;
+  if (date === shownToday) { date = t; day = lsGet("day-"+date) || {entries:[]}; meal = defaultMeal(); }
+  shownToday = t; render();
+}
+setInterval(checkNewDay, 60000);
+
+/* ---------------- motivational quote: a new one on every visit ---------------- */
+const QUOTES = [
+  "Small steps every day add up to big results.",
+  "You don't have to be perfect. You just have to be consistent.",
+  "Progress, not perfection.",
+  "One good meal won't change you. One good habit will.",
+  "Your future self is watching. Make them proud.",
+  "Strong is built one meal, one rep, one day at a time.",
+  "Show up today. That's the whole secret.",
+  "Every log is a vote for the person you want to become.",
+  "Fuel the body you're building.",
+  "Hard days count double.",
+  "You've done hard things before. This is one more.",
+  "Motivation gets you started. Habit keeps you going.",
+  "Eat like you respect yourself. Train like you mean it.",
+  "Don't break the streak.",
+  "Results come to those who keep showing up.",
+  "Be stronger than your excuses.",
+  "The best project you'll ever work on is you.",
+  "Track it. Own it. Crush it.",
+  "Today is a good day to get one step closer.",
+  "Slow progress is still progress.",
+  "Power isn't given. It's built.",
+  "Win the morning, win the day.",
+  "Nobody can do it for you. Good news: you've got this.",
+  "Consistency beats intensity.",
+  "Earn it today. Enjoy it tomorrow.",
+  "Every day is a fresh start.",
+  "Small wins are still wins.",
+  "The hardest part is starting. You already did.",
+  "Discipline is remembering what you want.",
+  "A year from now, you'll wish you started today. Good thing you did.",
+];
+function showQuote(){
+  const last = lsGet("quote");
+  let i; do { i = Math.floor(Math.random()*QUOTES.length); } while (i === last);
+  lsSet("quote", i);
+  const el = $("quote");
+  el.classList.remove("in"); void el.offsetWidth; // restart the fade-in
+  $("quoteText").textContent = QUOTES[i];
+  el.classList.add("in");
+}
+$("quote").onclick = showQuote;
 
 /* ---------------- boot ---------------- */
+showQuote();
 render();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
