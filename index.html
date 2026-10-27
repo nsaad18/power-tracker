@@ -134,6 +134,17 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .meal-add{display:flex;align-items:center;gap:6px;color:var(--red);font-weight:700;font-size:14px;padding:10px 14px;border-top:1px solid var(--line);width:100%}
 .empty{color:var(--muted);font-size:14px;text-align:center;padding:18px 8px;background:var(--card);border-radius:16px}
 
+/* coach */
+.coach{background:var(--card);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.coach-h{display:flex;align-items:center;gap:12px}
+.grade{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-family:var(--font-num);font-weight:900;font-size:25px;flex:none;color:#000}
+.coach-h .flabel{display:block;margin-bottom:2px}
+.coach-head{margin:0;font-weight:800;font-size:16px;line-height:1.3}
+.coach-list{list-style:none;margin:0;padding:12px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.coach-list li{display:flex;gap:10px;font-size:14px;line-height:1.4;color:#d1d1d6}
+.coach-list li i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+.coach-list b{color:var(--fg)}
+
 /* sheets */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -292,6 +303,8 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
   <p class="summary" id="summary"></p>
 
   <div class="macros" id="macros"></div>
+
+  <section class="coach" id="coach" aria-live="polite"></section>
 
   <div class="section-h"><h2>Diary</h2><span id="diaryCount"></span></div>
   <div id="diary" style="display:flex;flex-direction:column;gap:10px"></div>
@@ -589,6 +602,7 @@ function render(){
 
   renderOrbit();
   renderDiary();
+  renderCoach(T, tot);
 }
 
 let orbitEls = [], rot = 0, lastT = 0;
@@ -1117,7 +1131,109 @@ function checkNewDay(){
   if (date === shownToday) { date = t; day = lsGet("day-"+date) || {entries:[]}; meal = defaultMeal(); }
   shownToday = t; render();
 }
-setInterval(checkNewDay, 60000);
+setInterval(() => { checkNewDay(); renderCoach(targets(), totals(day.entries)); }, 60000); // coach judges against the clock
+
+/* ---------------- coach: brutally honest read of the day ----------------
+   Rules, not AI: runs on the phone, nothing is sent anywhere. Judges against how far through the day it is,
+   so a light breakfast at 9am isn't "under-eating". Shows the worst 3 problems and how to fix them. */
+const JUNK_RE = /chip|fries|poutine|donut|timbit|candy|chocolate|cookie|cake|tart|nanaimo|ice cream|pizza|burger|nugget|fried|cola|soda|energy drink|iced capp|double-double|kraft dinner|donair|shawarma plate|ginger beef/i;
+const SUGAR_DRINK_RE = /cola|soda|pop\b|energy drink|iced capp|double-double|juice|chocolate milk|frappuccino|slush|lemonade|sweet tea|soft.drink/i;
+const BOOZE_RE = /beer|wine|caesar|vodka|whisk|rum\b|tequila|gin\b|cocktail|cider|seltzer|margarita/i;
+const PLANT_RE = /salad|broccoli|spinach|carrot|bean|lentil|chickpea|apple|banana|orange|berr|grape|mango|vegetable|veggie|fruit|avocado|potato|corn|pepper|tomato|cucumber|kale|peas/i;
+const PLANT_EMOJI = ["🥦","🥬","🥗","🥕","🌽","🫛","🥑","🍌","🍎","🍊","🍓","🫐","🍇","🥭","🍠","🥔","🫘","🍅","🥒","🍐","🍑","🍍","🥝","🍉"];
+const GRADE_COL = {A:"var(--good)", B:"#a8e05f", C:"var(--fat)", D:"var(--carbs)", F:"var(--red)"};
+
+function renderCoach(T, tot){
+  const box = $("coach"), list = day.entries;
+  const now = new Date(), isToday = date === todayISO();
+  const h = now.getHours() + now.getMinutes()/60;
+  // how much of the day's food should be in by now: 0 at 7am, all of it by 8pm
+  const frac = isToday ? Math.min(1, Math.max(0, (h - 7) / 13)) : 1;
+  const final = !isToday || h >= 21;
+  const seed = [...date].reduce((a,ch) => a + ch.charCodeAt(0), 0) + list.length;
+  const pick = arr => arr[seed % arr.length];
+  const u = EU();
+
+  if (!list.length) {
+    const head = !isToday ? "You logged nothing. Can't fix what you don't track."
+      : h < 11 ? "Nothing logged yet. Breakfast is a thing, look it up."
+      : "It's past " + (h < 12 ? "11" : now.toLocaleTimeString("en-CA",{hour:"numeric"})) + " and you've logged nothing. Either you're starving or you're lying to the app.";
+    box.innerHTML = `<div class="coach-h"><span class="grade" style="background:#2c2c30;color:var(--muted)">?</span><div><span class="flabel">Coach</span><p class="coach-head">${esc(head)}</p></div></div>`;
+    return;
+  }
+
+  const kcalOf = e => e.kcal*e.qty;
+  const isJunk = e => JUNK_RE.test(e.name) && !/protein/i.test(e.name);
+  const junkK = list.filter(isJunk).reduce((a,e) => a + kcalOf(e), 0);
+  const drinkK = list.filter(e => SUGAR_DRINK_RE.test(e.name) && !/diet|zero/i.test(e.name)).reduce((a,e) => a + kcalOf(e), 0);
+  const boozeK = list.filter(e => BOOZE_RE.test(e.name)).reduce((a,e) => a + kcalOf(e), 0);
+  const plants = list.some(e => PLANT_RE.test(e.name) || PLANT_EMOJI.includes(e.emoji));
+  const ratio = tot.kcal / T.kcal;
+  const expP = T.p * frac, remP = Math.round(T.p - tot.p);
+  const issues = []; // [penalty, kind, headline, fix line]
+
+  if (ratio > 1.1) {
+    const over = E(tot.kcal - T.kcal);
+    issues.push([Math.min(40, (ratio-1)*120), "bad",
+      pick([`${over} ${u} over. The goal was a number, not a suggestion.`, `You blew past your calories by ${over}. That's not a cheat meal, that's a lifestyle.`, `Over by ${over} ${u}. Your goal didn't stand a chance.`]),
+      `<b>Over by ${over} ${u}.</b> Kitchen's closed. Water, then a 30-min walk. Tomorrow, plan dinner before you're hungry.`]);
+  }
+  if (final && ratio < 0.7) {
+    issues.push([25, "bad",
+      pick([`You ate ${Math.round(ratio*100)}% of your target. Starving isn't discipline, it backfires.`, `${Math.round(ratio*100)}% of your calories. You're not cutting, you're crashing.`]),
+      `<b>Under-ate by ${E(T.kcal - tot.kcal)} ${u}.</b> Eat a real meal: chicken, rice and veg. Starving now means bingeing later.`]);
+  }
+  if (frac >= 0.35 && remP > 15 && tot.p < expP * 0.75) {
+    const chicken = Math.round(remP/31*100/10)*10, whey = Math.ceil(remP/24);
+    issues.push([Math.min(30, (1 - tot.p/Math.max(expP,1))*40), "bad",
+      pick([`Protein's at ${Math.round(tot.p)} g. Your muscles are filing a complaint.`, `${Math.round(tot.p)} g of protein? That's a snack, not a day.`, `Protein is way behind. You can't build anything on ${Math.round(tot.p)} g.`]),
+      `<b>Protein ${Math.round(tot.p)} / ${T.p} g.</b> Get ${remP} g more: about ${chicken} g of chicken breast, or ${whey} scoop${whey>1?"s":""} of whey.`]);
+  }
+  const junkShare = junkK / Math.max(tot.kcal, 1);
+  if (junkK >= 250 && junkShare >= 0.35) {
+    issues.push([Math.min(30, junkShare*50), "bad",
+      pick([`${Math.round(junkShare*100)}% of today was junk. That's not fuel, that's garbage with a barcode.`, `Most of today came out of a fryer or a wrapper. Be honest with yourself.`, `${Math.round(junkShare*100)}% junk. Your body deserves better than this shit.`]),
+      `<b>${Math.round(junkShare*100)}% junk food.</b> Next snack: Greek yogurt, fruit or jerky. Not chips.`]);
+  }
+  if (drinkK >= 200) {
+    issues.push([10, "warn", `You drank ${E(drinkK)} ${u}. Liquid sugar does nothing but make you hungrier.`,
+      `<b>${E(drinkK)} ${u} from sugary drinks.</b> Switch to water, black coffee or diet. Free win.`]);
+  }
+  if (boozeK >= 250) {
+    issues.push([15, "warn", `${E(boozeK)} ${u} of booze. Empty calories and wrecked recovery.`,
+      `<b>${E(boozeK)} ${u} of alcohol.</b> Cap it at 1–2 drinks and eat protein first.`]);
+  }
+  if (!plants && (list.length >= 3 || final)) {
+    issues.push([10, "warn", `Zero fruit, zero veg. Fibre exists, look it up.`,
+      `<b>No fruit or veg.</b> Add a banana, an apple or a bag of salad. Takes 10 seconds.`]);
+  }
+  const expF = T.f * frac;
+  if (frac >= 0.35 && tot.f > expF * 1.3 && tot.f - T.f * frac > 20) {
+    issues.push([10, "warn", `Fat's running hot at ${Math.round(tot.f)} g. Ease up on the fried stuff and the butter.`,
+      `<b>Fat ${Math.round(tot.f)} / ${T.f} g.</b> Pick grilled over fried, and go light on oil, cheese and sauces.`]);
+  }
+
+  issues.sort((a,b) => b[0] - a[0]);
+  const score = 100 - issues.reduce((a,x) => a + x[0], 0);
+  const grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 55 ? "D" : "F";
+
+  let head, lines = issues.slice(0,3).map(x => [x[1], x[3]]);
+  if (issues.length) head = issues[0][2];
+  else if (final) head = pick(["Clean day. Calories on point, protein handled. Do it again tomorrow.", "Locked in. This is what winning looks like. Repeat.", "No notes. Annoyingly good day."]);
+  else head = pick(["On track so far. Don't get sloppy at dinner.", "Solid so far. Don't fumble it tonight.", "Good start. Now finish the job."]);
+  if (!final && (ratio < 1 || remP > 0)) {
+    const leftK = `${E(Math.max(0, T.kcal - tot.kcal))} ${u}`;
+    lines.push(["good", remP > 0 ? `<b>Left today:</b> ${leftK} and ${remP} g protein. Lean meat, rice and veg gets it done.`
+      : `<b>Protein's handled.</b> ${leftK} left. Keep it clean: veg, fruit or a light protein snack.`]);
+  }
+  if (!P.setup) lines.push(["warn", `<b>Set your goals</b> in Settings so I can judge you properly.`]);
+  lines = lines.slice(0,3);
+
+  const dot = {bad:"var(--red)", warn:"var(--carbs)", good:"var(--good)"};
+  box.innerHTML = `<div class="coach-h"><span class="grade" style="background:${GRADE_COL[grade]};${grade==="F"?"color:#fff":""}">${grade}</span>
+      <div><span class="flabel">Coach${final ? "" : " · so far"}</span><p class="coach-head">${esc(head)}</p></div></div>
+    ${lines.length ? `<ul class="coach-list">${lines.map(([k,t]) => `<li><i style="background:${dot[k]}"></i><span>${t}</span></li>`).join("")}</ul>` : ""}`;
+}
 
 /* ---------------- motivational quote: a new one on every visit ---------------- */
 const QUOTES = [

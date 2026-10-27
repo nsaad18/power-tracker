@@ -16,6 +16,7 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 ## Features
 - Motivational quote card under the header (`QUOTES` array): a new one on every open, when coming back to the app after 30+ s, or on tap.
 - Daily calories + protein / carbs / fat, diary by meal, day-to-day navigation (arrows or swipe on the ring), streak counter.
+- Coach card under the macros (`renderCoach`): brutally honest grade A–F + up to 3 "what's wrong / how to fix" lines. Rule-based, runs on the phone (Nader chose this over a real AI API). Judges against time of day; tone is blunt with light swearing, on purpose.
 - App feel: sticky blurred header, swipe a sheet down by its top bar to close, no double-tap zoom or text-select on buttons, page behind sheets doesn't scroll.
 - Search: built-in Canadian food list (`FOODS` array) + "Search online" via Open Food Facts (Canada filter).
 - Live barcode scanner: camera via `getUserMedia` + ZXing (`@zxing/library@0.21.3` from unpkg). Detects automatically, then looks the code up on Open Food Facts. Unknown products get entered once from the label and are saved in `P.barcodes`.
