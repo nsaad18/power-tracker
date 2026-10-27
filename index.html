@@ -771,6 +771,8 @@ function renderResults(){
     const hits = FOOD_OBJS.map(f => [f, score(f)]).filter(x => x[1]).sort((a,b)=>b[1]-a[1]).map(x=>x[0]).slice(0,25);
     add("Your foods", mine);
     add("Food database", hits);
+    const cached = searchCache[q];
+    if (!(aiResults && aiFor === q) && cached && Date.now() - cached.t < 14*864e5) { aiResults = cached.items; aiFor = q; }
     if (aiResults && aiFor === q) add("Online", aiResults);
     if (!(aiResults && aiFor === q)) html += `<button class="btn ghosty" id="aiLookup">Search online for “${esc($("q").value.trim())}”</button>`;
     html += `<div class="status" id="aiStatus"></div>`;
@@ -783,7 +785,7 @@ $("results").onclick = e => { const b = e.target.closest("[data-pick]"); if (b) 
 
 /* ---------------- Open Food Facts ---------------- */
 const num = v => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? Math.round(n*10)/10 : 0; };
-const OFF = "https://world.openfoodfacts.org";
+const OFF = "https://world.openfoodfacts.org", OFF_CA = "https://ca.openfoodfacts.org";
 const OFF_FIELDS = "code,product_name,product_name_en,product_name_fr,brands,serving_size,serving_quantity,nutriments,categories_tags";
 function emojiFor(p){
   const t = ((p.categories_tags||[]).join(" ")+" "+(p.product_name||"")).toLowerCase();
@@ -805,30 +807,61 @@ function fromOFF(p){
   if (!f.kcal && !f.p && !f.c && !f.f) return null;
   return f;
 }
+// Open Food Facts is often overloaded and answers 503 ("busy"). Retry with a short wait, switching
+// between the world site and the Canada site; a 404 means "not found" and is not retried.
+async function offFetch(urls, {tries = 9, onRetry} = {}){
+  let busy = false;
+  for (let i = 0; i < tries; i++) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
+    try {
+      const r = await fetch(urls[i % urls.length], {signal: ctl.signal});
+      if (r.ok) return await r.json();
+      if (r.status === 404) return null;
+      busy = true;
+    } catch { if (!navigator.onLine) throw new Error("offline"); busy = true; }
+    finally { clearTimeout(timer); }
+    if (i < tries - 1) { onRetry && onRetry(i + 1, tries); await new Promise(res => setTimeout(res, 700 + i*500)); }
+  }
+  throw new Error(busy ? "busy" : "failed");
+}
 async function offProduct(code){
   const tries = [code]; if (/^\d{12}$/.test(code)) tries.push("0"+code); if (/^0\d{12}$/.test(code)) tries.push(code.slice(1));
   for (const c of tries) {
-    const r = await fetch(`${OFF}/api/v2/product/${c}.json?fields=${OFF_FIELDS}`);
-    if (!r.ok) continue;
-    const j = await r.json();
-    if (j.status === 1 && j.product) { const f = fromOFF(j.product); if (f) return f; }
+    const path = `/api/v2/product/${c}.json?fields=${OFF_FIELDS}`;
+    const j = await offFetch([OFF + path, OFF_CA + path], {tries: 4});
+    if (j && j.status === 1 && j.product) { const f = fromOFF(j.product); if (f) return f; }
   }
   return null;
 }
+// remember recent online searches on the phone, so a repeat search is instant and works offline
+const searchCache = lsGet("searchCache") || {};
+function cacheSearch(q, items){
+  searchCache[q] = {t: Date.now(), items};
+  const keys = Object.keys(searchCache).sort((a,b) => searchCache[b].t - searchCache[a].t);
+  keys.slice(40).forEach(k => delete searchCache[k]);
+  lsSet("searchCache", searchCache);
+}
 async function aiLookup(){
   const q = $("q").value.trim(); if (!q) return;
+  const key = q.toLowerCase();
+  const hit = searchCache[key];
+  if (hit && Date.now() - hit.t < 14*864e5) { aiResults = hit.items; aiFor = key; renderResults(); return; }
   const st = $("aiStatus"); st.className = "status"; st.innerHTML = `<span class="spinner"></span>Searching…`;
   $("aiLookup").disabled = true;
+  const terms = encodeURIComponent(q);
+  const common = `/cgi/search.pl?search_terms=${terms}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`;
   try {
-    const url = `${OFF}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=canada`;
-    const r = await fetch(url); if (!r.ok) throw 0;
-    const j = await r.json();
-    const items = (j.products||[]).map(fromOFF).filter(Boolean).slice(0,12);
-    aiResults = items; aiFor = q.toLowerCase();
+    const j = await offFetch([OFF_CA + common, `${OFF}${common}&tagtype_0=countries&tag_contains_0=contains&tag_0=canada`], {
+      onRetry: (n, of) => { const s = $("aiStatus"); if (s) s.innerHTML = `<span class="spinner"></span>Food database is busy, retrying (${n}/${of - 1})…`; }
+    });
+    const items = ((j && j.products) || []).map(fromOFF).filter(Boolean).slice(0,12);
+    aiResults = items; aiFor = key;
+    if (items.length) cacheSearch(key, items);
     renderResults();
     const s2 = $("aiStatus"); if (s2) s2.textContent = items.length ? "" : "Nothing found online. Try fewer words, or use Quick add.";
-  } catch {
-    const s2 = $("aiStatus"); if (s2) { s2.className = "status err"; s2.textContent = "Couldn't reach the food database. Check your connection."; }
+  } catch (e) {
+    const s2 = $("aiStatus");
+    if (s2) { s2.className = "status err"; s2.textContent = e.message === "offline" ? "You're offline. Connect to search online." : "The food database is overloaded right now (their side, not yours). Try again in a minute, or use Quick add."; }
     const b = $("aiLookup"); if (b) b.disabled = false;
   }
 }
@@ -883,7 +916,7 @@ async function lookupCode(code){
     if (food) { st.textContent = ""; openDetail({food, barcode: code}); return; }
     st.textContent = "Not in the database yet. Enter it from the label once and it's saved for next time.";
   } catch {
-    st.className = "status err"; st.textContent = "Couldn't reach the food database. Enter it from the label instead.";
+    st.className = "status err"; st.textContent = "The food database is busy right now. Enter it from the label, or scan again in a minute.";
   }
   openDetail({food: {name:"", brand:"", serving:"1 serving", kcal:0, p:0, c:0, f:0, emoji:"🛒", src:"manual"}, barcode: code});
 }

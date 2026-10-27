@@ -22,6 +22,8 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 - Coach card under the macros (`renderCoach`): brutally honest grade A–F + up to 3 "what's wrong / how to fix" lines. Rule-based, runs on the phone (Nader chose this over a real AI API). Judges against time of day; tone is blunt with light swearing, on purpose.
 - App feel: sticky blurred header, swipe a sheet down by its top bar to close, no double-tap zoom or text-select on buttons, page behind sheets doesn't scroll.
 - Search: built-in Canadian food list (`FOODS` array) + "Search online" via Open Food Facts (Canada filter).
+  - OFF's search (`cgi/search.pl`) is often overloaded and returns 503 (checked 2026-10-26: most calls failed). `offFetch` retries up to 9 times with growing waits, alternating ca.openfoodfacts.org and world.openfoodfacts.org (both allow CORS); 404 = not found, no retry. Successful searches are cached on the phone (`searchCache`, 40 queries, 14 days).
+  - search.openfoodfacts.org (their newer search) works but does NOT send CORS headers, so the browser can't use it.
 - Live barcode scanner: camera via `getUserMedia` + ZXing (`@zxing/library@0.21.3` from unpkg). Detects automatically, then looks the code up on Open Food Facts. Unknown products get entered once from the label and are saved in `P.barcodes`.
 - Quick add (calories and/or macros).
 - Food verdict: tapping a food (search result or diary entry) shows a Clean / Okay / Junk / Trash badge with up to 4 +/− reasons (`verdictHTML`, rule-based, coach voice).
