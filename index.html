@@ -93,6 +93,18 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .ring-track{fill:none;stroke:#26090c;stroke-width:16}
 .ring-prog{fill:none;stroke:url(#ringGrad);stroke-width:16;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}
 .ring-glow{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,rgba(255,45,61,.16),transparent 70%);pointer-events:none}
+/* liquid fill: rises with calories eaten (--lvl 0..1), sloshes when food is added */
+.liquid{position:absolute;inset:9%;border-radius:50%;overflow:hidden;-webkit-mask-image:-webkit-radial-gradient(white,black);--lvl:0}
+.liquid .tilt{position:absolute;inset:-25%}
+.liquid.slosh .tilt{animation:slosh 1.4s ease-out}
+.wave{position:absolute;left:0;width:200%;height:100%;top:calc(16.667% + (1 - var(--lvl)) * 66.667% - 3%);transition:top .9s cubic-bezier(.2,.8,.2,1);animation:wave 6s linear infinite}
+.wave.back{fill:rgba(179,18,31,.5);animation-duration:9s;animation-direction:reverse}
+.wave.front{fill:rgba(255,45,61,.34);filter:drop-shadow(0 -2px 6px rgba(255,45,61,.7))}
+.liquid.over .wave.front{fill:rgba(255,45,61,.55);animation:wave 6s linear infinite,hot 1.6s ease-in-out infinite alternate}
+@keyframes wave{to{transform:translateX(-50%)}}
+@keyframes slosh{15%{transform:rotate(-8deg)}40%{transform:rotate(6deg)}65%{transform:rotate(-3deg)}85%{transform:rotate(1deg)}}
+@keyframes hot{to{opacity:.7}}
+.log-pill{box-shadow:0 2px 10px rgba(0,0,0,.45)}
 .ring-center{position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
 .ring-center .big{font-size:42px;line-height:1;letter-spacing:-.02em}
 .ring-center .sub{color:var(--muted);font-size:13px}
@@ -104,7 +116,11 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .bubble{position:absolute;left:0;top:0;width:var(--s);height:var(--s);margin:calc(var(--s)/-2) 0 0 calc(var(--s)/-2);pointer-events:auto;will-change:transform}
 .bubble-in{width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 30% 25%,#2c2c30,#161618 70%);border:1px solid #333338;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);animation:bob var(--d) ease-in-out infinite alternate,pop .5s cubic-bezier(.2,1.6,.4,1) both}
 .bubble-in .em{font-size:calc(var(--s)*.4);line-height:1}
-.bubble-in .k{font-family:var(--font-num);font-weight:800;font-size:10px;color:var(--muted);margin-top:1px}
+.bubble-in .k{font-family:var(--font-num);font-weight:800;font-size:clamp(9px,calc(var(--s)*.18),12px);color:var(--muted);margin-top:1px}
+.bubble.junk .bubble-in{border-color:rgba(255,159,10,.75);box-shadow:0 0 16px rgba(255,159,10,.45),0 8px 22px rgba(0,0,0,.6)}
+.bubble.clean .bubble-in{border-color:rgba(48,209,88,.75);box-shadow:0 0 16px rgba(48,209,88,.4),0 8px 22px rgba(0,0,0,.6)}
+.legend{display:flex;justify-content:center;gap:14px;color:var(--muted);font-size:12px;margin-top:-10px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
 .bubble.more .bubble-in{background:var(--card-2)}
 .bubble.more .em{font-family:var(--font-num);font-weight:900;font-size:15px;color:var(--fg)}
 .ghost{position:absolute;inset:8%;border-radius:50%;border:1px dashed #1f1f23;pointer-events:none}
@@ -233,7 +249,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .mini{width:62px;padding:7px;text-align:center;background:#242427;border:1px solid var(--line);border-radius:9px;outline:none}
 
 @media (prefers-reduced-motion:reduce){
-  .bubble-in,.quote.in span{animation:none!important}
+  .bubble-in,.quote.in span,.wave,.liquid .tilt{animation:none!important}
   .sheet,.scrim,.ring-prog{transition:none}
 }
 /* live scanner */
@@ -288,6 +304,10 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
     <div class="ghost"></div>
     <div class="ring-glow"></div>
     <button class="ring-btn" id="ringBtn" aria-label="Log food">
+      <span class="liquid" id="liquid" aria-hidden="true"><span class="tilt">
+        <svg class="wave back" viewBox="0 0 200 100" preserveAspectRatio="none"><path d="M0 4Q12.5 0 25 4T50 4T75 4T100 4T125 4T150 4T175 4T200 4V100H0Z"/></svg>
+        <svg class="wave front" viewBox="0 0 200 100" preserveAspectRatio="none"><path d="M0 4Q12.5 8 25 4T50 4T75 4T100 4T125 4T150 4T175 4T200 4V100H0Z"/></svg>
+      </span></span>
       <svg class="ring-svg" viewBox="0 0 260 260" aria-hidden="true">
         <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a4d"/><stop offset="1" stop-color="#ff1f3d"/></linearGradient></defs>
         <circle class="ring-track" cx="130" cy="130" r="118"/>
@@ -302,6 +322,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
     <div class="orbit" id="orbit"></div>
   </div>
   <p class="summary" id="summary"></p>
+  <div class="legend" id="legend" hidden><span><i style="background:var(--good);box-shadow:0 0 6px var(--good)"></i>Clean</span><span><i style="background:var(--carbs);box-shadow:0 0 6px var(--carbs)"></i>Junk</span></div>
 
   <div class="macros" id="macros"></div>
 
@@ -578,6 +599,8 @@ function render(){
   $("summary").innerHTML = `<b>${E(tot.kcal).toLocaleString()}</b> eaten of <b>${E(T.kcal).toLocaleString()}</b> ${EU()}`;
   const frac = Math.min(1, tot.kcal / T.kcal);
   $("ringProg").style.strokeDashoffset = CIRC * (1 - frac);
+  $("liquid").style.setProperty("--lvl", frac.toFixed(3));
+  $("liquid").classList.toggle("over", left < 0);
 
   const s = streak();
   $("streakN").textContent = s;
@@ -615,27 +638,30 @@ function renderOrbit(){
   const shown = list.length > max ? list.slice(-(max-1)) : list;
   const extra = list.length - shown.length;
   const n = shown.length + (extra ? 1 : 0);
-  const maxK = Math.max(1, ...shown.map(e=>e.kcal*e.qty));
   let html = "";
   shown.forEach((e,i) => {
     const k = e.kcal*e.qty;
-    const size = 40 + Math.round(12 * Math.sqrt(k/maxK));
+    // size follows real calories: a black coffee is tiny, a poutine is huge
+    const size = Math.round(Math.min(64, 30 + Math.sqrt(k)*1.3));
     const dur = (2.6 + (i%4)*0.55).toFixed(2);
     const fresh = e.id === lastAddedId;
-    html += `<button class="bubble" data-entry="${e.id}" data-i="${i}" style="--s:${size}px;--d:${dur}s" aria-label="${esc(e.name)}, ${E(k)} ${EU()}">
+    const kind = foodKind(e);
+    html += `<button class="bubble ${kind}" data-entry="${e.id}" data-i="${i}" style="--s:${size}px;--d:${dur}s" aria-label="${esc(e.name)}, ${E(k)} ${EU()}${kind ? ", "+kind+" food" : ""}">
       <span class="bubble-in" style="${fresh ? "" : "animation:bob var(--d) ease-in-out -"+(i*0.7).toFixed(1)+"s infinite alternate"}"><span class="em">${esc(e.emoji||"🍽️")}</span><span class="k">${E(k)}</span></span></button>`;
   });
   if (extra) html += `<button class="bubble more" data-more="1" data-i="${shown.length}" style="--s:40px;--d:3s" aria-label="${extra} more foods">
       <span class="bubble-in" style="animation:bob 3s ease-in-out infinite alternate"><span class="em">+${extra}</span></span></button>`;
   o.innerHTML = html;
-  orbitEls = [...o.children].map(el => ({el, base: (-90 + (+el.dataset.i)*(360/Math.max(n,1))) * Math.PI/180}));
+  orbitEls = [...o.children].map(el => ({el, s: parseFloat(el.style.getPropertyValue("--s")), base: (-90 + (+el.dataset.i)*(360/Math.max(n,1))) * Math.PI/180}));
   placeBubbles();
   lastAddedId = null;
+  const kinds = shown.map(foodKind);
+  $("legend").hidden = !kinds.some(Boolean);
 }
 function placeBubbles(){
   const W = $("stage").clientWidth; if (!W) return;
-  const R = W/2 - 28; // keeps the biggest bubble inside the stage
-  for (const {el, base} of orbitEls) {
+  for (const {el, s, base} of orbitEls) {
+    const R = W/2 - s/2 - 3; // each bubble hugs the stage edge, so big ones stay clear of the ring
     const a = base + rot;
     el.style.transform = `translate(${(W/2 + Math.cos(a)*R).toFixed(1)}px,${(W/2 + Math.sin(a)*R).toFixed(1)}px)`;
   }
@@ -901,6 +927,7 @@ function addEntry(food, qty, m, remember=true){
   lastAddedId = e.id;
   if (remember) rememberFood(food);
   saveDay(); render();
+  const lq = $("liquid"); lq.classList.remove("slosh"); void lq.offsetWidth; lq.classList.add("slosh");
   if (navigator.vibrate) try { navigator.vibrate(12); } catch {}
 }
 function rememberFood(food){
@@ -1142,6 +1169,12 @@ const SUGAR_DRINK_RE = /cola|soda|pop\b|energy drink|iced capp|double-double|jui
 const BOOZE_RE = /beer|wine|caesar|vodka|whisk|rum\b|tequila|gin\b|cocktail|cider|seltzer|margarita/i;
 const PLANT_RE = /salad|broccoli|spinach|carrot|bean|lentil|chickpea|apple|banana|orange|berr|grape|mango|vegetable|veggie|fruit|avocado|potato|corn|pepper|tomato|cucumber|kale|peas/i;
 const PLANT_EMOJI = ["🥦","🥬","🥗","🥕","🌽","🫛","🥑","🍌","🍎","🍊","🍓","🫐","🍇","🥭","🍠","🥔","🫘","🍅","🥒","🍐","🍑","🍍","🥝","🍉"];
+// bubble glow: junk = fried/sugary/booze, clean = fruit/veg or protein-dense; everything else stays plain
+function foodKind(e){
+  if ((JUNK_RE.test(e.name) && !/protein/i.test(e.name)) || (SUGAR_DRINK_RE.test(e.name) && !/diet|zero/i.test(e.name)) || BOOZE_RE.test(e.name)) return "junk";
+  if (PLANT_RE.test(e.name) || PLANT_EMOJI.includes(e.emoji) || (e.kcal > 0 && e.p*4/e.kcal >= 0.3)) return "clean";
+  return "";
+}
 const GRADE_COL = {A:"var(--good)", B:"#a8e05f", C:"var(--fat)", D:"var(--carbs)", F:"var(--red)"};
 
 function renderCoach(T, tot){

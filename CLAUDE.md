@@ -13,6 +13,8 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 - Branding copies Nader's Power Vape store logo (`Documents\powervape-site`): lowercase "power tracker" in Sora (self-hosted in `fonts/`, OFL licence) with a glowing power symbol as the "o" — red here instead of the store's blue. App icons are the red power symbol alone; to redraw them, the generator was a no-dependency Python script (PNG via zlib).
 - Never scrolls sideways. Must look right at iPhone width (~390px).
 - Signature feature: tap the calorie ring to log food; logged foods float around the ring as bubbles.
+  - Inside the ring, red liquid (`.liquid`, CSS var `--lvl`) rises with calories eaten, with moving waves; it sloshes when food is added and pulses when over goal.
+  - Bubble size follows real calories (32–64 px). Bubbles glow orange for junk and green for clean food (`foodKind`, shares the coach's word lists); a small legend shows under the summary.
 
 ## Features
 - Motivational quote card under the header (`QUOTES` array): a new one on every open, when coming back to the app after 30+ s, or on tap.
