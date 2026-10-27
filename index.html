@@ -371,6 +371,10 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
     </div>
 
     <div id="pane-quick" hidden style="display:flex;flex-direction:column;gap:12px">
+      <button type="button" class="btn ghosty" id="pasteClaude">📋 Paste from Claude</button>
+      <div class="field" id="pasteBox" hidden><label for="pasteText">Paste the link Claude sent you</label>
+        <div class="grid2" style="grid-template-columns:1fr auto"><input class="inp" id="pasteText" placeholder="https://nsaad18.github.io/power-tracker/#add=…" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="btn" id="pasteGo" style="width:auto;padding:0 16px">Add</button></div></div>
+      <div class="status" id="pasteStatus"></div>
       <div class="field"><label for="qaName">Name (optional)</label><input class="inp" id="qaName" placeholder="Quick add"></div>
       <div class="field"><label for="qaKcal" id="qaKcalL">Calories</label><input class="inp num" id="qaKcal" type="number" inputmode="decimal" placeholder="Leave blank to work it out from macros"></div>
       <div class="grid3">
@@ -1407,6 +1411,65 @@ function showQuote(){
 }
 $("quote").onclick = showQuote;
 
+/* ---------------- magic link: foods sent from a Claude chat ----------------
+   A link like .../#add=<base64url JSON> carries {i:[[name, serving, kcal, protein, carbs, fat, emoji, meal]]}.
+   On iPhone a tapped link opens in Safari, not the home-screen app (separate storage), so the app also
+   takes the link pasted in (Log food › Quick add › Paste from Claude). Nothing is added without a confirm. */
+function decodeMagic(text){
+  const s = String(text || "").trim();
+  const m = s.match(/#add=([A-Za-z0-9_-]+)/) || s.match(/^([A-Za-z0-9_-]{16,})$/);
+  if (!m) return null;
+  try {
+    const b = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    const o = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b + "===".slice((b.length + 3) % 4)), ch => ch.charCodeAt(0))));
+    const n = v => Math.min(5000, num(v));
+    const items = (Array.isArray(o.i) ? o.i : []).slice(0, 20).map(x => Array.isArray(x) && typeof x[0] === "string" ? {
+      name: x[0].slice(0, 80), serving: String(x[1] || "1 serving").slice(0, 60), kcal: Math.round(n(x[2])), p: n(x[3]), c: n(x[4]), f: n(x[5]),
+      emoji: String(x[6] || "🍽️").slice(0, 8), meal: MEALS.includes(x[7]) ? x[7] : null, src: "claude"
+    } : null).filter(Boolean);
+    return items.length ? items : null;
+  } catch { return null; }
+}
+function confirmMagic(items){
+  $("fdTitle").textContent = "Add from Claude";
+  const T = items.reduce((a, f) => { a.k += f.kcal; a.p += f.p; a.c += f.c; a.f += f.f; return a; }, {k:0,p:0,c:0,f:0});
+  $("fdBody").innerHTML = `
+    <div class="list">${items.map(f => `<div class="row" style="cursor:default"><span class="em">${esc(f.emoji)}</span>
+      <span class="txt"><b>${esc(f.name)}</b><span>${esc(f.serving)} · ${esc(f.meal || meal)} · P ${fmtG(f.p)} C ${fmtG(f.c)} F ${fmtG(f.f)}</span></span>
+      <span class="kc num">${E(f.kcal)}</span></div>`).join("")}</div>
+    <div class="group"><div class="target"><span class="flabel">Total</span><span class="num">${E(T.k).toLocaleString()} <small style="font-size:14px;color:var(--muted)">${EU()}</small></span></div>
+      <span class="hint">Protein ${fmtG(T.p)} g · Carbs ${fmtG(T.c)} g · Fat ${fmtG(T.f)} g · goes into today's diary</span></div>
+    <button class="btn" id="mgGo">Add ${items.length} item${items.length === 1 ? "" : "s"}</button>`;
+  $("mgGo").onclick = () => {
+    if (date !== todayISO()) { date = todayISO(); day = lsGet("day-"+date) || {entries:[]}; }
+    for (const f of items) addEntry(f, 1, f.meal || meal, false);
+    closeSheet("Detail"); closeSheet("Log");
+  };
+  openSheet("Detail");
+}
+function takeMagicFromUrl(){
+  const items = decodeMagic(location.hash);
+  if (!items) return;
+  history.replaceState(null, "", location.pathname + location.search); // so a reload doesn't offer it again
+  confirmMagic(items);
+}
+addEventListener("hashchange", takeMagicFromUrl);
+$("pasteClaude").onclick = async () => {
+  const st = $("pasteStatus"); st.className = "status"; st.textContent = "";
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch {}
+  const items = decodeMagic(text);
+  if (items) { confirmMagic(items); return; }
+  $("pasteBox").hidden = false; $("pasteText").focus();
+  if (text) { st.className = "status err"; st.textContent = "Your clipboard doesn't have a Claude link. Paste it below."; }
+};
+$("pasteGo").onclick = () => {
+  const items = decodeMagic($("pasteText").value), st = $("pasteStatus");
+  if (!items) { st.className = "status err"; st.textContent = "That isn't a Claude food link. Copy the whole link and try again."; return; }
+  $("pasteText").value = ""; $("pasteBox").hidden = true; st.textContent = "";
+  confirmMagic(items);
+};
+
 /* ---------------- shake & tilt the water ----------------
    Tilt (deviceorientation gamma) keeps the surface level; shakes (devicemotion) kick a spring
    that swings and bounces the water. iPhone needs a one-time permission from a tap. */
@@ -1478,6 +1541,7 @@ addEventListener("pointerdown", () => { if (P.motion && !motionAllowed) askMotio
 showQuote();
 render();
 applyMotion();
+takeMagicFromUrl();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
