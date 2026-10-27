@@ -95,7 +95,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .ring-glow{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,rgba(255,45,61,.16),transparent 70%);pointer-events:none}
 /* liquid fill: rises with calories eaten (--lvl 0..1), sloshes when food is added */
 .liquid{position:absolute;inset:9%;border-radius:50%;overflow:hidden;-webkit-mask-image:-webkit-radial-gradient(white,black);--lvl:0}
-.liquid .tilt{position:absolute;inset:-25%}
+.liquid .tilt{position:absolute;inset:-25%;transform-origin:50% calc(16.667% + (1 - var(--lvl)) * 66.667%)} /* pivot on the water surface */
 .liquid.slosh .tilt{animation:slosh 1.4s ease-out}
 .wave{position:absolute;left:0;width:200%;height:100%;top:calc(16.667% + (1 - var(--lvl)) * 66.667% - 3%);transition:top .9s cubic-bezier(.2,.8,.2,1);animation:wave 6s linear infinite}
 .wave.back{fill:rgba(179,18,31,.5);animation-duration:9s;animation-direction:reverse}
@@ -233,6 +233,14 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .fd-hero h4{margin:0;font-size:19px;line-height:1.2}
 .fd-hero span{color:var(--muted);font-size:13px}
 .fd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+/* food verdict: brutally honest breakdown of one food */
+.verdict{background:var(--card);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;border-left:3px solid var(--vc)}
+.verdict-h{display:flex;align-items:center;gap:10px}
+.vbadge{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--vc);color:#000;flex:none}
+.verdict-h b{font-size:15px;line-height:1.3}
+.verdict ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.verdict li{display:flex;gap:8px;font-size:13.5px;line-height:1.4;color:#d1d1d6}
+.verdict li i{font-style:normal;font-weight:900;width:12px;flex:none;text-align:center}
 .fd-stats div{background:var(--card);border-radius:12px;padding:10px 6px;text-align:center}
 .fd-stats .num{font-size:20px;display:block}
 .fd-stats small{font-size:11px;color:var(--muted);font-weight:600}
@@ -537,7 +545,7 @@ async function load(key){ return lsGet(key); }
 const DEFAULT_PROFILE = {
   setup:false, units:{w:"kg",h:"cm",e:"kcal"}, sex:"male", age:30, heightCm:178, weightKg:80, goalWeightKg:75,
   activity:1.55, goal:-550, macro:"balanced", custom:[30,40,30], override:false, overrideKcal:2200,
-  loggedDays:[], recents:[], barcodes:{}
+  loggedDays:[], recents:[], barcodes:{}, motion:false
 };
 const todayISO = () => new Date().toLocaleDateString("en-CA");
 let P = Object.assign({}, DEFAULT_PROFILE, lsGet("profile") || {});
@@ -927,7 +935,7 @@ function addEntry(food, qty, m, remember=true){
   lastAddedId = e.id;
   if (remember) rememberFood(food);
   saveDay(); render();
-  const lq = $("liquid"); lq.classList.remove("slosh"); void lq.offsetWidth; lq.classList.add("slosh");
+  if (!kickWater(0.5)) { const lq = $("liquid"); lq.classList.remove("slosh"); void lq.offsetWidth; lq.classList.add("slosh"); }
   if (navigator.vibrate) try { navigator.vibrate(12); } catch {}
 }
 function rememberFood(food){
@@ -955,6 +963,7 @@ function openDetail({food, entry, barcode}){
       <div class="fd-hero"><span class="em">${esc(f.emoji||"🍽️")}</span><div><h4 id="fdName0">${esc(f.name || "New product")}</h4>
         <span>${esc(f.brand ? f.brand+" · " : "")}${esc(f.serving)}${f.src==="off" ? ' <span class="tag">Open Food Facts</span>' : ""}${barcode ? ` <span class="tag">${esc(barcode)}</span>` : ""}</span></div></div>
       <div class="fd-stats" id="fdStats">${statsHTML()}</div>
+      <div id="fdVerdict">${verdictHTML(f, qty)}</div>
       <div class="stepper"><button id="qMinus" aria-label="Less">−</button>
         <div><span class="num" id="qVal">${fmtG(qty)}</span><small>serving${qty===1?"":"s"} of ${esc(f.serving)}</small></div>
         <button id="qPlus" aria-label="More">+</button></div>
@@ -974,8 +983,8 @@ function openDetail({food, entry, barcode}){
     $("fdMeals").onclick = e => { const b = e.target.closest("[data-m]"); if (b) { m = b.dataset.m; draw(); } };
     if (editable) {
       // update the numbers in place; redrawing the whole sheet would kick the cursor out of the next box
-      const bind = (id, key, isNum) => $(id).oninput = ev => { f[key] = isNum ? num(ev.target.value) : ev.target.value; if (key==="kcal") f.kcal = Math.round(f.kcal); $("fdStats").innerHTML = statsHTML(); };
-      $("fdName").oninput = ev => { f.name = ev.target.value; $("fdGo").disabled = !f.name.trim(); $("fdName0").textContent = f.name || "New product"; }; bind("fdServ","serving"); bind("fdK","kcal",1); bind("fdP","p",1); bind("fdC","c",1); bind("fdF","f",1);
+      const bind = (id, key, isNum) => $(id).oninput = ev => { f[key] = isNum ? num(ev.target.value) : ev.target.value; if (key==="kcal") f.kcal = Math.round(f.kcal); $("fdStats").innerHTML = statsHTML(); $("fdVerdict").innerHTML = verdictHTML(f, qty); };
+      $("fdName").oninput = ev => { f.name = ev.target.value; $("fdGo").disabled = !f.name.trim(); $("fdName0").textContent = f.name || "New product"; $("fdVerdict").innerHTML = verdictHTML(f, qty); }; bind("fdServ","serving"); bind("fdK","kcal",1); bind("fdP","p",1); bind("fdC","c",1); bind("fdF","f",1);
     }
     $("fdGo").onclick = () => {
       if (editing) {
@@ -1069,6 +1078,11 @@ function renderSettings(){
       ${d.override ? `<div class="field"><label for="sOvK">Daily calories (kcal)</label><input class="inp num" id="sOvK" type="number" inputmode="numeric" value="${d.overrideKcal}"></div>` : ""}
     </div>
 
+    <div class="group">
+      <div class="switch"><div><h4>Shake &amp; tilt the water</h4><span class="hint">Tilt your phone and the water stays level. Shake it to make a splash.</span></div><input type="checkbox" id="sMotion" ${d.motion?"checked":""} aria-label="Shake and tilt the water"></div>
+      <span class="hint" id="motionMsg"></span>
+    </div>
+
     <div class="group"><h4>Your data</h4>
       <span class="hint">Everything is saved on this phone. Back it up now and then.</span>
       <div class="backup"><button type="button" class="btn ghosty" id="bkSave">Back up</button>
@@ -1101,7 +1115,7 @@ $("setBody").addEventListener("change", async e => {
       Object.entries(j.days||{}).forEach(([k,v]) => lsSet(k, v));
       P = Object.assign({}, DEFAULT_PROFILE, j.profile); lsSet("profile", P);
       day = lsGet("day-"+date) || {entries:[]};
-      closeSheet("Settings"); render();
+      closeSheet("Settings"); render(); applyMotion();
     } catch { $("bkMsg").textContent = "That file isn't a Power Tracker backup."; }
     return;
   }
@@ -1121,6 +1135,7 @@ function readSetting(el){
   if (id==="sGoal") draft.goal = n;
   if (id==="sP"||id==="sC"||id==="sF") draft.custom = [parseFloat($("sP").value)||0, parseFloat($("sC").value)||0, parseFloat($("sF").value)||0];
   if (id==="sOv") draft.override = el.checked;
+  if (id==="sMotion") draft.motion = el.checked && motionAllowed;
   if (id==="sOvK" && n>0) draft.overrideKcal = n;
 }
 $("saveSettings").onclick = () => {
@@ -1128,7 +1143,7 @@ $("saveSettings").onclick = () => {
   draft.setup = true;
   // keep lists that may have changed while the sheet was open
   draft.recents = P.recents; draft.loggedDays = P.loggedDays; draft.barcodes = P.barcodes;
-  P = draft; persist("profile", P); closeSheet("Settings"); render();
+  P = draft; persist("profile", P); closeSheet("Settings"); render(); applyMotion();
 };
 
 /* ---------------- day nav ---------------- */
@@ -1164,7 +1179,7 @@ setInterval(() => { checkNewDay(); renderCoach(targets(), totals(day.entries)); 
 /* ---------------- coach: brutally honest read of the day ----------------
    Rules, not AI: runs on the phone, nothing is sent anywhere. Judges against how far through the day it is,
    so a light breakfast at 9am isn't "under-eating". Shows the worst 3 problems and how to fix them. */
-const JUNK_RE = /chip|fries|poutine|donut|timbit|candy|chocolate|cookie|cake|tart|nanaimo|ice cream|pizza|burger|nugget|fried|cola|soda|energy drink|iced capp|double-double|kraft dinner|donair|shawarma plate|ginger beef/i;
+const JUNK_RE = /chip|fries|poutine|donut|timbit|candy|chocolate|cookie|cake|tart|nanaimo|ice cream|pizza|burger|nugget|fried|cola|soda|energy drink|iced capp|double-double|kraft dinner|donair|ginger beef/i;
 const SUGAR_DRINK_RE = /cola|soda|pop\b|energy drink|iced capp|double-double|juice|chocolate milk|frappuccino|slush|lemonade|sweet tea|soft.drink/i;
 const BOOZE_RE = /beer|wine|caesar|vodka|whisk|rum\b|tequila|gin\b|cocktail|cider|seltzer|margarita/i;
 const PLANT_RE = /salad|broccoli|spinach|carrot|bean|lentil|chickpea|apple|banana|orange|berr|grape|mango|vegetable|veggie|fruit|avocado|potato|corn|pepper|tomato|cucumber|kale|peas/i;
@@ -1174,6 +1189,52 @@ function foodKind(e){
   if ((JUNK_RE.test(e.name) && !/protein/i.test(e.name)) || (SUGAR_DRINK_RE.test(e.name) && !/diet|zero/i.test(e.name)) || BOOZE_RE.test(e.name)) return "junk";
   if (PLANT_RE.test(e.name) || PLANT_EMOJI.includes(e.emoji) || (e.kcal > 0 && e.p*4/e.kcal >= 0.3)) return "clean";
   return "";
+}
+// food verdict: scores one food (per serving x qty) and explains why, in the coach's voice
+const HEALTHY_FAT_RE = /almond|nut|avocado|olive|salmon|egg|peanut|seed/i;
+const SLOW_CARB_RE = /oat|quinoa|brown rice|whole wheat|lentil|bean|chickpea|sweet potato|basmati/i;
+const VERDICT = {
+  Clean: ["var(--good)", ["Clean. This is what you should be eating.", "Solid choice. Your body says thanks.", "Fuel, not filler. Eat more of this."]],
+  Okay:  ["var(--fat)", ["It's fine. Not great, not terrible.", "Middle of the road. Watch the portion.", "Okay in moderation. Don't make it a habit."]],
+  Junk:  ["var(--carbs)", ["Junk. Tastes good, does nothing for you.", "This is a treat, not a meal. Act like it.", "Your goals just took a hit."]],
+  Trash: ["var(--red)", ["Straight trash for your goals. Enjoy it, then move on.", "This one's a disaster. One time, not every time.", "Calories with zero payoff. Be honest with yourself."]],
+};
+function verdictHTML(f, qty){
+  if (!f.name && !f.kcal && !f.p && !f.c && !f.f) return ""; // blank product still being typed in
+  const k = f.kcal*qty, p = f.p*qty, fat = f.f*qty, c = f.c*qty, u = EU();
+  const pd = f.kcal ? f.p*4/f.kcal : 0, fs = f.kcal ? f.f*9/f.kcal : 0;
+  const name = f.name || "";
+  const lines = []; let score = 50;
+  const good = t => lines.push(["+", "var(--good)", t]), bad = t => lines.push(["−", "var(--red)", t]), meh = t => lines.push(["~", "var(--fat)", t]);
+
+  if (f.kcal < 15) { good(`Basically zero calories.${/cola|pop|soda/i.test(name) ? " Still pop though, so don't live on it." : " Go for it."}`); score += 15; }
+  let drink = false;
+  if (BOOZE_RE.test(name)) { bad(`Alcohol: ${E(k)} ${u} of empty calories. Slows fat loss and wrecks recovery.`); score -= 25; drink = true; }
+  else if (SUGAR_DRINK_RE.test(name) && !/diet|zero/i.test(name) && f.kcal >= 15) { bad(`Liquid sugar: ${fmtG(c)} g carbs you'll drink in a minute and still be hungry.`); score -= 25; drink = true; }
+  else if (JUNK_RE.test(name) && !/protein/i.test(name) && f.kcal >= 15) { bad(`Fried or processed. Tastes great, does nothing for your goals.`); score -= 30; }
+  if (f.kcal >= 15) {
+    if (pd >= 0.4 && p >= 10) { good(`Protein beast: ${fmtG(p)} g protein for ${E(k)} ${u}. This is what builds muscle.`); score += 25; }
+    else if (pd >= 0.25 && p >= 5) { good(`Solid protein: ${fmtG(p)} g.`); score += 15; }
+    else if (pd >= 0.18 && p >= 30) { good(`Big protein hit: ${fmtG(p)} g.`); score += 10; }
+    else if (pd >= 0.18 && p >= 5) { meh(`Some protein: ${fmtG(p)} g.`); score += 5; }
+    else if (pd < 0.1 && k >= 150 && !drink) { bad(`Barely any protein (${fmtG(p)} g). Won't keep you full on its own.`); score -= 10; }
+    if (fs >= 0.55 && fat >= 10) {
+      if (HEALTHY_FAT_RE.test(name)) { meh(`Mostly fat (${fmtG(fat)} g), but the good kind. Just watch the portion.`); score -= 5; }
+      else { bad(`${fmtG(fat)} g fat, ${Math.round(fs*100)}% of its calories. Calorie bomb, easy to overdo.`); score -= 15; }
+    }
+  }
+  if (PLANT_RE.test(name) || PLANT_EMOJI.includes(f.emoji)) { good(`Fruit or veg: fibre and vitamins, fills you up for cheap.`); score += 20; }
+  else if (SLOW_CARB_RE.test(name)) { good(`Slow carbs: steady energy, no crash.`); score += 10; }
+  const T = targets();
+  if (k >= 600) { bad(`${E(k)} ${u} in one go. That's ${Math.round(k/T.kcal*100)}% of your whole day.`); score -= 15; }
+  else if (k <= 120 && score >= 50 && f.kcal >= 15) { good(`Light: only ${E(k)} ${u}.`); score += 10; }
+  if (!lines.length) meh(`Nothing special either way. ${fmtG(p)} g protein, ${fmtG(c)} g carbs, ${fmtG(fat)} g fat.`);
+
+  const rating = score >= 70 ? "Clean" : score >= 40 ? "Okay" : score >= 20 ? "Junk" : "Trash";
+  const [col, heads] = VERDICT[rating];
+  const head = heads[[...name].reduce((a,ch) => a + ch.charCodeAt(0), 0) % heads.length];
+  return `<div class="verdict" style="--vc:${col}"><div class="verdict-h"><span class="vbadge"${rating==="Trash"?' style="color:#fff"':""}>${rating}</span><b>${esc(head)}</b></div>
+    <ul>${lines.slice(0,4).map(([sym,c2,t]) => `<li><i style="color:${c2}">${sym}</i><span>${esc(t)}</span></li>`).join("")}</ul></div>`;
 }
 const GRADE_COL = {A:"var(--good)", B:"#a8e05f", C:"var(--fat)", D:"var(--carbs)", F:"var(--red)"};
 
@@ -1313,9 +1374,77 @@ function showQuote(){
 }
 $("quote").onclick = showQuote;
 
+/* ---------------- shake & tilt the water ----------------
+   Tilt (deviceorientation gamma) keeps the surface level; shakes (devicemotion) kick a spring
+   that swings and bounces the water. iPhone needs a one-time permission from a tap. */
+let motionAllowed = !!window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== "function";
+async function askMotion(){
+  try {
+    const reqs = [window.DeviceMotionEvent, window.DeviceOrientationEvent].filter(x => x && typeof x.requestPermission === "function");
+    if (!reqs.length) return !!window.DeviceMotionEvent;
+    const res = await Promise.all(reqs.map(x => x.requestPermission()));
+    return res.every(r => r === "granted");
+  } catch { return false; }
+}
+$("setBody").addEventListener("click", async e => {
+  if (e.target.id !== "sMotion" || !e.target.checked) return;
+  motionAllowed = await askMotion();
+  draft.motion = motionAllowed;
+  renderSettings();
+  if (!motionAllowed) $("motionMsg").textContent = window.DeviceMotionEvent
+    ? "Motion access is blocked. On iPhone: Settings › Apps › Safari › Advanced › Website Data, remove this site, then try again."
+    : "This device doesn't have motion sensors.";
+});
+
+const water = {on:false, a:0, va:0, y:0, vy:0, target:0, raf:0, last:0};
+function onTilt(e){
+  // portrait only: gamma is left/right roll; turn the water the other way so it stays level
+  water.target = innerHeight > innerWidth && e.gamma != null ? Math.max(-35, Math.min(35, -e.gamma)) : 0;
+}
+function onShake(e){
+  const a = e.acceleration; if (!a) return;
+  const m = Math.hypot(a.x||0, a.y||0, a.z||0);
+  if (m < 2.5) return;
+  // push the swing the way it's already moving (back-and-forth shakes would otherwise cancel out)
+  const push = Math.min(90, (m - 2.5) * 9), dir = Math.sign(water.va) || Math.sign(a.x||0) || 1;
+  water.va += dir * push;
+  water.vy += (Math.sign(water.vy) || -1) * push * 0.8;
+}
+function kickWater(power){
+  if (!water.on) return false;
+  water.va += (Math.random() < 0.5 ? -1 : 1) * 90 * power; water.vy += 60 * power;
+  return true;
+}
+function waterStep(t){
+  const dt = Math.min(0.05, (t - (water.last || t)) / 1000); water.last = t;
+  water.va += (40*(water.target - water.a) - 2.5*water.va) * dt; // springy swing toward level
+  water.vy += (-70*water.y - 4*water.vy) * dt;                  // bounce up and down
+  water.a = Math.max(-45, Math.min(45, water.a + water.va*dt));
+  water.y = Math.max(-28, Math.min(28, water.y + water.vy*dt));
+  document.querySelector("#liquid .tilt").style.transform = `translateY(${water.y.toFixed(1)}px) rotate(${water.a.toFixed(2)}deg)`;
+  water.raf = water.on && !document.hidden ? requestAnimationFrame(waterStep) : 0;
+}
+function applyMotion(){
+  const want = !!P.motion;
+  if (want === water.on) return;
+  water.on = want;
+  if (want) {
+    addEventListener("deviceorientation", onTilt); addEventListener("devicemotion", onShake);
+    water.last = 0; water.raf = requestAnimationFrame(waterStep);
+  } else {
+    removeEventListener("deviceorientation", onTilt); removeEventListener("devicemotion", onShake);
+    cancelAnimationFrame(water.raf); Object.assign(water, {a:0, va:0, y:0, vy:0, target:0});
+    document.querySelector("#liquid .tilt").style.transform = "";
+  }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && water.on && !water.raf) { water.last = 0; water.raf = requestAnimationFrame(waterStep); } });
+// iPhone may want the permission again after a restart: the first tap re-asks (no popup if already allowed)
+addEventListener("pointerdown", () => { if (P.motion && !motionAllowed) askMotion().then(ok => motionAllowed = ok); }, {once:true});
+
 /* ---------------- boot ---------------- */
 showQuote();
 render();
+applyMotion();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>

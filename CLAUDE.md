@@ -24,6 +24,8 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 - Search: built-in Canadian food list (`FOODS` array) + "Search online" via Open Food Facts (Canada filter).
 - Live barcode scanner: camera via `getUserMedia` + ZXing (`@zxing/library@0.21.3` from unpkg). Detects automatically, then looks the code up on Open Food Facts. Unknown products get entered once from the label and are saved in `P.barcodes`.
 - Quick add (calories and/or macros).
+- Food verdict: tapping a food (search result or diary entry) shows a Clean / Okay / Junk / Trash badge with up to 4 +/− reasons (`verdictHTML`, rule-based, coach voice).
+- Shake & tilt the water (Settings switch, `P.motion`, off by default): deviceorientation keeps the liquid level, devicemotion shakes kick a spring (`waterStep`). iPhone needs a one-time permission from a real tap.
 - Settings: kg/lb, cm/ft-in, kcal/kJ, age/height/weight/goal, activity, weekly goal (Mifflin-St Jeor), macro presets or custom, manual calorie override, backup/restore to a JSON file.
 
 ## Data
