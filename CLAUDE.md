@@ -10,6 +10,7 @@ Nader's personal calorie tracker. A single-page web app hosted on GitHub Pages a
 ## Design rules (from Nader)
 - Simple, neat, user-friendly. Apple Health look. No clutter.
 - Black background, red (`--red: #ff2d3d`) as the accent.
+- Branding copies Nader's Power Vape store logo (`Documents\powervape-site`): lowercase "power tracker" in Sora (self-hosted in `fonts/`, OFL licence) with a glowing power symbol as the "o" — red here instead of the store's blue. App icons are the red power symbol alone; to redraw them, the generator was a no-dependency Python script (PNG via zlib).
 - Never scrolls sideways. Must look right at iPhone width (~390px).
 - Signature feature: tap the calorie ring to log food; logged foods float around the ring as bubbles.
 

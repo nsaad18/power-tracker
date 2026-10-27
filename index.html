@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preload" href="fonts/sora-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
 <script defer src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
@@ -62,9 +63,12 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .btn:active,.icon-btn:active,.nudge:active,.quote:active,.chip:active,.tab:active,.stepper button:active,.meal-add:active{transform:scale(.97);opacity:.8}
 .row:active{background:var(--card-2)}
 .datebar button:active,.close:active{opacity:.5}
-.brand{display:flex;align-items:center;gap:10px}
-.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--red),var(--red-deep));display:grid;place-items:center}
-.brand h1{font-size:22px;font-weight:800;letter-spacing:-.02em;margin:0}
+/* wordmark: Power Vape's logo style (lowercase Sora, power symbol as the "o"), in the app's red */
+@font-face{font-family:"Sora";src:url("fonts/sora-latin-wght-normal.woff2") format("woff2");font-weight:100 800;font-display:swap}
+.logo{display:inline-flex;align-items:baseline;margin:0;font-family:"Sora",var(--font-ui);font-weight:500;font-size:25px;letter-spacing:-.02em;line-height:1;white-space:nowrap;color:#fff}
+.logo svg{width:.64em;height:.69em;margin:0 .01em -.02em;color:var(--red);filter:drop-shadow(0 0 5px rgba(255,45,61,.55))}
+.logo .gap{width:.28em}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .top-actions{display:flex;align-items:center;gap:8px}
 .streak{display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 11px 5px 8px;font-size:14px}
 .streak .num{font-size:15px}
@@ -251,10 +255,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 
 <div class="app" id="app">
   <header class="top">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#fff"/></svg></div>
-      <h1>Power Tracker</h1>
-    </div>
+    <h1 class="logo"><span class="sr-only">Power Tracker</span><span aria-hidden="true">p</span><svg viewBox="0 0 64 69" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" aria-hidden="true"><path d="M32 4.5V35"/><path d="M18.3 19.7a24.5 24.5 0 1 0 27.4 0"/></svg><span aria-hidden="true">wer</span><span class="gap" aria-hidden="true"></span><span aria-hidden="true">tracker</span></h1>
     <div class="top-actions">
       <div class="streak" title="Days in a row with food logged">
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 4 5 5.5 5 11a5 5 0 0 1-10 0c0-2.5 1.2-4 2.5-5 .3 2 1.3 3 2.5 3-1-3 0-6 0-9z" fill="var(--red)"/></svg>
@@ -267,7 +268,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
   </header>
 
   <button class="quote" id="quote" aria-live="polite" aria-label="Motivational quote. Tap for another.">
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="var(--red)"/></svg>
+    <svg width="17" height="18" viewBox="0 0 64 69" fill="none" stroke="var(--red)" stroke-width="9" stroke-linecap="round" aria-hidden="true"><path d="M32 4.5V35"/><path d="M18.3 19.7a24.5 24.5 0 1 0 27.4 0"/></svg>
     <span id="quoteText"></span>
   </button>
 
