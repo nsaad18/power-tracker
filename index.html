@@ -188,6 +188,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .chip{padding:6px 12px;border-radius:999px;background:var(--card);font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
 .chip.on{background:var(--fg);color:#000}
+[data-day].chip.on{background:var(--red);color:#fff} /* day pickers are red so they don't look like the meal chips */
 .search{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:12px;padding:0 12px}
 .search input{flex:1;background:none;border:0;padding:12px 0;outline:none;min-width:0}
 .list{background:var(--card);border-radius:16px;overflow:hidden}
@@ -345,6 +346,7 @@ input,select{font:inherit;font-size:16px;color:var(--fg)}
 <section class="sheet" id="sheetLog" aria-label="Log food">
   <div class="sheet-h"><h3>Log food</h3><button class="close" data-close="Log">Done</button></div>
   <div class="sheet-b">
+    <div class="chips" id="logDays"></div>
     <div class="chips" id="mealChips"></div>
     <div class="tabs" id="tabs">
       <button class="tab on" data-tab="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button>
@@ -568,6 +570,21 @@ function saveDay(){
   const arr = [...set].sort().slice(-400);
   if (arr.join() !== P.loggedDays.join()) setProfile({loggedDays: arr});
 }
+// save a day that isn't the one on screen (moving an entry there)
+function saveOtherDay(iso, obj){
+  persist("day-"+iso, obj);
+  const set = new Set(P.loggedDays);
+  if (obj.entries.length) set.add(iso); else set.delete(iso);
+  setProfile({loggedDays: [...set].sort().slice(-400)});
+}
+// day picker chips: Today, Yesterday, then the last week by weekday (plus the day on screen if older)
+function dayChips(id, sel){
+  const out = [], d = new Date();
+  for (let i = 0; i < 7; i++) { out.push([d.toLocaleDateString("en-CA"), i === 0 ? "Today" : i === 1 ? "Yesterday" : d.toLocaleDateString("en-CA", {weekday:"short", day:"numeric"})]); d.setDate(d.getDate()-1); }
+  if (!out.some(x => x[0] === sel)) out.push([sel, new Date(sel+"T12:00:00").toLocaleDateString("en-CA", {month:"short", day:"numeric"})]);
+  return `<div class="chips" id="${id}">${out.map(([iso, l]) => `<button type="button" class="chip ${iso === sel ? "on" : ""}" data-day="${iso}">${l}</button>`).join("")}</div>`;
+}
+function switchDay(iso){ if (iso === date) return; date = iso; day = lsGet("day-"+date) || {entries:[]}; render(); }
 
 /* ---------------- math ---------------- */
 function targets(){
@@ -746,8 +763,14 @@ function setTab(t){
 }
 function openLog(m){
   if (m) meal = m; else if (date === todayISO()) meal = defaultMeal();
-  renderMealChips(); setTab(tab); openSheet("Log");
+  renderLogDays(); renderMealChips(); setTab(tab); openSheet("Log");
 }
+// which day the food goes into: picking one here also moves the home screen to that day
+function renderLogDays(){ $("logDays").outerHTML = dayChips("logDays", date); }
+$("sheetLog").addEventListener("click", e => {
+  const b = e.target.closest("#logDays [data-day]"); if (!b) return;
+  switchDay(b.dataset.day); renderLogDays();
+});
 $("ringBtn").onclick = () => openLog();
 
 const rowHTML = (f, idx, extraTag="") => `<button class="row" data-pick="${idx}">
@@ -988,6 +1011,7 @@ function openDetail({food, entry, barcode}){
   let qty = editing ? entry.qty : 1;
   let m = editing ? entry.meal : meal;
   let editable = f.src === "manual" && !editing;
+  let target = date; // editing: which day the entry belongs to (pick another day to move it)
   $("fdTitle").textContent = editing ? "Edit entry" : "Add food";
   const body = $("fdBody");
   const statsHTML = () => `
@@ -1005,6 +1029,7 @@ function openDetail({food, entry, barcode}){
         <div><span class="num" id="qVal">${fmtG(qty)}</span><small>serving${qty===1?"":"s"} of ${esc(f.serving)}</small></div>
         <button id="qPlus" aria-label="More">+</button></div>
       <div class="chips" id="fdMeals">${MEALS.map(x=>`<button class="chip ${x===m?"on":""}" data-m="${x}">${x}</button>`).join("")}</div>
+      ${editing ? dayChips("fdDays", target) : ""}
       ${editable ? `<div class="group"><h4>Per serving</h4>
         <div class="grid2"><div class="field"><label for="fdName">Name</label><input class="inp" id="fdName" value="${esc(f.name)}"></div>
         <div class="field"><label for="fdServ">Serving</label><input class="inp" id="fdServ" value="${esc(f.serving)}"></div></div>
@@ -1018,6 +1043,7 @@ function openDetail({food, entry, barcode}){
     $("qMinus").onclick = () => { qty = Math.max(0.25, Math.round((qty - (qty > 1 ? 0.5 : 0.25))*100)/100); draw(); };
     $("qPlus").onclick = () => { qty = Math.round((qty + (qty >= 1 ? 0.5 : 0.25))*100)/100; draw(); };
     $("fdMeals").onclick = e => { const b = e.target.closest("[data-m]"); if (b) { m = b.dataset.m; draw(); } };
+    if (editing) $("fdDays").onclick = e => { const b = e.target.closest("[data-day]"); if (b) { target = b.dataset.day; draw(); } };
     if (editable) {
       // update the numbers in place; redrawing the whole sheet would kick the cursor out of the next box
       const bind = (id, key, isNum) => $(id).oninput = ev => { f[key] = isNum ? num(ev.target.value) : ev.target.value; if (key==="kcal") f.kcal = Math.round(f.kcal); $("fdStats").innerHTML = statsHTML(); $("fdVerdict").innerHTML = verdictHTML(f, qty); };
@@ -1026,7 +1052,15 @@ function openDetail({food, entry, barcode}){
     $("fdGo").onclick = () => {
       if (editing) {
         const i = day.entries.findIndex(x => x.id === entry.id);
-        if (i > -1) day.entries[i] = Object.assign({}, day.entries[i], {qty, meal: m});
+        if (i > -1) {
+          const updated = Object.assign({}, day.entries[i], {qty, meal: m});
+          if (target === date) day.entries[i] = updated;
+          else { // moved to another day
+            day.entries.splice(i, 1);
+            const other = lsGet("day-"+target) || {entries:[]};
+            other.entries.push(updated); saveOtherDay(target, other);
+          }
+        }
         saveDay(); render();
       } else {
         addEntry(f, qty, m);
@@ -1412,7 +1446,7 @@ function showQuote(){
 $("quote").onclick = showQuote;
 
 /* ---------------- magic link: foods sent from a Claude chat ----------------
-   A link like .../#add=<base64url JSON> carries {i:[[name, serving, kcal, protein, carbs, fat, emoji, meal]]}.
+   A link like .../#add=<base64url JSON> carries {d:"YYYY-MM-DD" (optional), i:[[name, serving, kcal, protein, carbs, fat, emoji, meal]]}.
    On iPhone a tapped link opens in Safari, not the home-screen app (separate storage), so the app also
    takes the link pasted in (Log food › Quick add › Paste from Claude). Nothing is added without a confirm. */
 function decodeMagic(text){
@@ -1427,10 +1461,12 @@ function decodeMagic(text){
       name: x[0].slice(0, 80), serving: String(x[1] || "1 serving").slice(0, 60), kcal: Math.round(n(x[2])), p: n(x[3]), c: n(x[4]), f: n(x[5]),
       emoji: String(x[6] || "🍽️").slice(0, 8), meal: MEALS.includes(x[7]) ? x[7] : null, src: "claude"
     } : null).filter(Boolean);
-    return items.length ? items : null;
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(o.d) && o.d <= todayISO() ? o.d : null;
+    return items.length ? {items, d} : null;
   } catch { return null; }
 }
-function confirmMagic(items){
+function confirmMagic({items, d}){
+  let pick = d || date; // the day the link names, else the day on screen
   $("fdTitle").textContent = "Add from Claude";
   const T = items.reduce((a, f) => { a.k += f.kcal; a.p += f.p; a.c += f.c; a.f += f.f; return a; }, {k:0,p:0,c:0,f:0});
   $("fdBody").innerHTML = `
@@ -1438,10 +1474,17 @@ function confirmMagic(items){
       <span class="txt"><b>${esc(f.name)}</b><span>${esc(f.serving)} · ${esc(f.meal || meal)} · P ${fmtG(f.p)} C ${fmtG(f.c)} F ${fmtG(f.f)}</span></span>
       <span class="kc num">${E(f.kcal)}</span></div>`).join("")}</div>
     <div class="group"><div class="target"><span class="flabel">Total</span><span class="num">${E(T.k).toLocaleString()} <small style="font-size:14px;color:var(--muted)">${EU()}</small></span></div>
-      <span class="hint">Protein ${fmtG(T.p)} g · Carbs ${fmtG(T.c)} g · Fat ${fmtG(T.f)} g · goes into today's diary</span></div>
+      <span class="hint">Protein ${fmtG(T.p)} g · Carbs ${fmtG(T.c)} g · Fat ${fmtG(T.f)} g</span></div>
+    <span class="flabel">Add to which day?</span>
+    ${dayChips("mgDays", pick)}
     <button class="btn" id="mgGo">Add ${items.length} item${items.length === 1 ? "" : "s"}</button>`;
+  const onDays = e => {
+    const b = e.target.closest("[data-day]"); if (!b) return;
+    pick = b.dataset.day; $("mgDays").outerHTML = dayChips("mgDays", pick); $("mgDays").onclick = onDays;
+  };
+  $("mgDays").onclick = onDays;
   $("mgGo").onclick = () => {
-    if (date !== todayISO()) { date = todayISO(); day = lsGet("day-"+date) || {entries:[]}; }
+    switchDay(pick);
     for (const f of items) addEntry(f, 1, f.meal || meal, false);
     closeSheet("Detail"); closeSheet("Log");
   };
